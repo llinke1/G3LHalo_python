@@ -215,7 +215,7 @@ class halomodel:
 
         return integrate.quad(kernel, self.mmin, self.mmax)[0]
 
-    def lens_lens_ps_1h(self, k, z, type1=1, type2=2):
+    def lens_lens_ps_1h(self, ks, z, type1=1, type2=2):
 
         n1=self.get_ave_numberdensity(z, type1)
         if type1==type2:
@@ -223,11 +223,16 @@ class halomodel:
         else:
             n2=self.get_ave_numberdensity(z, type2)
 
-        kernel=lambda m: self.G_ab(k, k, m, z, type1, type2)*self.dndm(m,z)
+        ks=np.array(ks)
+        integral=[]
 
-        integral=integrate.quad(kernel, self.mmin, self.mmax)
+        for k in ks:
+            kernel=lambda m: self.G_ab(k, k, m, z, type1, type2)*self.dndm(m,z)
+
+            integral.append(integrate.quad(kernel, self.mmin, self.mmax)[0])
         #integral=quad(kernel, self.mmin, self.mmax)
 
+        integral=np.array(integral)
         return integral/n1/n2
 
     # def lens_lens_ps_2h
