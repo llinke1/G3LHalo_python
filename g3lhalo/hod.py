@@ -7,3 +7,4 @@ def HOD_Zheng(alpha, mth, sigma, mprime, beta):
     Nsat= lambda m: Ncen(m)/alpha*np.power(m/mprime, beta)
     
     return Ncen, Nsat
+
