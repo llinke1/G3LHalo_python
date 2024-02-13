@@ -10,6 +10,15 @@ c_over_H0 = 3000  # Mpc/h
 class halomodel:
 
     def __init__(self, verbose=False, cosmo=None, hmfunc=None, hbfunc=None, cmfunc=None):
+        """Halomodel initialization. Automatically assigns cosmology, halo mass function, halo bias and concetration mass relation if these are specified.
+
+        Args:
+            verbose (bool, optional): Control verbosity. Defaults to False.
+            cosmo (dict, optional): Cosmological parameters as dictionary. Needs to include 'Om_b', 'Om_c', 'h', 'sigma_8', 'n_s'. Other parameters are ignored. Defaults to None.
+            hmfunc (function, optional): Halo mass function [dn/dlog10(M/Msun)]. Needs to be function of halo mass and scale factor. Defaults to None.
+            hbfunc (function, optional): Halo bias function. Needs to be function of halo mass and scale factor. Defaults to None.
+            cmfunc (function, optional): Concentration mass relation. Needs to be function of halo mass and scale factor. Defaults to None.
+        """
 
         self.verbose=verbose
 
@@ -30,6 +39,11 @@ class halomodel:
 
 
     def set_cosmo(self, cosmo):
+        """Sets cosmology
+
+        Args:
+            cosmo (dict): Cosmological parameters as dictionary. Needs to include 'Om_b', 'Om_c', 'h', 'sigma_8', 'n_s'. Other parameters are ignored.
+        """
 
         if self.verbose:
             print("Setting cosmology")
@@ -52,6 +66,11 @@ class halomodel:
 
 
     def set_hmf(self, hmfunc):
+        """ Sets halo mass function. Note that the internal model.dndm is in units of 1/Msun/Mpc³ and a function of mass and redshift not scale factor!
+
+        Args:
+            hmfunc (function): Halo mass function [dn/dlog10(M/Msun)]. Needs to be function of halo mass and scale factor. 
+        """
 
         if self.verbose:
             print("Setting halo mass function")
@@ -62,6 +81,11 @@ class halomodel:
         )
 
     def set_halobias(self, hbfunc):
+        """Sets halo bias function.
+
+        Args:
+            hbfunc (_type_): _description_
+        """
         if self.verbose:
             print("Setting halo bias function")
             print(hbfunc)
