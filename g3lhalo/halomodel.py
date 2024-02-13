@@ -219,7 +219,7 @@ class halomodel:
                 kernel = (
                     lambda m: self.G_a(k, m, z, type2) * self.dndm(m, z) * self.bh(m, z)
                 )
-                integral2.append(integrate.quad(kernel, self.mmin, self.mmax)[0])
+                integral2.append(integrate.quad(kernel, mmin, mmax)[0])
             integral2 = np.array(integral2)
 
         return integral1 * integral2 * self.pk_lin(ks, z)
@@ -237,7 +237,7 @@ class halomodel:
 
         return One_halo, Two_halo, One_halo + Two_halo
 
-    def source_lens_ps_1h(self, ks, z, type=1):
+    def source_lens_ps_1h(self, ks, z, type=1, mmin=1e10, mmax=1e17):
 
         ks = np.array(ks)
 
@@ -249,29 +249,29 @@ class halomodel:
                 * m
                 * self.u_NFW(k, m, z, 1.0)
             )
-            integral.append(integrate.quad(kernel, self.mmin, self.mmax)[0])
+            integral.append(integrate.quad(kernel, mmin, mmax)[0])
 
         integral = np.array(integral)
         return integral
 
-    def source_lens_ps_2h(self, ks, z, type=1):
+    def source_lens_ps_2h(self, ks, z, type=1, mmin=1e10, mmax=1e17):
         ks = np.array(ks)
 
         integral1 = []
         for k in ks:
             kernel = lambda m: self.G_a(k, m, z, type) * self.dndm(m, z) * self.bh(m, z)
-            integral1.append(integrate.quad(kernel, self.mmin, self.mmax)[0])
+            integral1.append(integrate.quad(kernel, mmin, mmax)[0])
         integral1 = np.array(integral1)
 
         integral2 = []
         for k in ks:
             kernel = lambda m: self.u_NFW(k, m, z, 1.0) * self.dndm(m, z) * m
-            integral2.append(integrate.quad(kernel, self.mmin, self.mmax)[0])
+            integral2.append(integrate.quad(kernel, mmin, mmax)[0])
         integral2 = np.array(integral2)
 
         return integral1 * integral2 * self.pk_lin(ks, z)
 
-    def source_lens_ps(self, ks, z, type=1):
+    def source_lens_ps(self, ks, z, type=1, mmin=1e10, mmax=1e17):
         n = self.get_ave_numberdensity(z, type)
         rho_bar = ccl.rho_x(self.cosmo, 1 / (1 + z), "matter")
 
@@ -280,7 +280,7 @@ class halomodel:
 
         return One_halo, Two_halo, One_halo + Two_halo
 
-    def source_lens_lens_bs_1h(self, k1, k2, k3, z, type1=1, type2=2):
+    def source_lens_lens_bs_1h(self, k1, k2, k3, z, type1=1, type2=2, mmin=1e10, mmax=1e17):
 
         kernel = (
             lambda m: self.dndm(m, z)
@@ -288,28 +288,28 @@ class halomodel:
             * self.u_NFW(k1, m, z, 1.0)
             * self.G_ab(k2, k3, m, z, type1, type2)
         )
-        integral = integrate.quad(kernel, self.mmin, self.mmax)[0]
+        integral = integrate.quad(kernel, mmin, mmax)[0]
 
         return integral
 
-    def source_lens_lens_bs_2h(self, k1, k2, k3, z, type1=1, type2=2):
+    def source_lens_lens_bs_2h(self, k1, k2, k3, z, type1=1, type2=2, mmin=1e10, mmax=1e17):
 
         kernel = (
             lambda m: self.dndm(m, z) * self.u_NFW(k1, m, z, 1.0) * m * self.bh(m, z)
         )
-        summand1 = integrate.quad(kernel, self.mmin, self.mmax)[0]
+        summand1 = integrate.quad(kernel, mmin, mmax)[0]
 
         kernel = (
             lambda m: self.dndm(m, z)
             * self.G_ab(k2, k3, m, z, type1, type2)
             * self.bh(m, z)
         )
-        summand1 *= integrate.quad(kernel, self.mmin, self.mmax)[0]
+        summand1 *= integrate.quad(kernel, mmin, mmax)[0]
 
         summand1 *= self.pk_lin(k3, z)
 
         kernel = lambda m: self.dndm(m, z) * self.G_a(k2, m, z, type1) * self.bh(m, z)
-        summand2 = integrate.quad(kernel, self.mmin, self.mmax)[0]
+        summand2 = integrate.quad(kernel, mmin, mmax)[0]
 
         kernel = (
             lambda m: self.dndm(m, z)
@@ -318,12 +318,12 @@ class halomodel:
             * self.u_NFW(k1, m, z, 1.0)
             * self.bh(m, z)
         )
-        summand2 *= integrate.quad(kernel, self.mmin, self.mmax)[0]
+        summand2 *= integrate.quad(kernel, mmin, mmax)[0]
 
         summand2 *= self.pk_lin(k1, z)
 
         kernel = lambda m: self.dndm(m, z) * self.G_a(k3, m, z, type2) * self.bh(m, z)
-        summand3 = integrate.quad(kernel, self.mmin, self.mmax)[0]
+        summand3 = integrate.quad(kernel, mmin, mmax)[0]
 
         kernel = (
             lambda m: self.dndm(m, z)
@@ -332,22 +332,22 @@ class halomodel:
             * self.u_NFW(k1, m, z, 1.0)
             * self.bh(m, z)
         )
-        summand3 *= integrate.quad(kernel, self.mmin, self.mmax)[0]
+        summand3 *= integrate.quad(kernel, mmin, mmax)[0]
 
         summand3 *= self.pk_lin(k2, z)
 
         return summand1 + summand2 + summand3
 
-    def source_lens_lens_bs_3h(self, k1, k2, k3, z, type1=1, type2=2):
+    def source_lens_lens_bs_3h(self, k1, k2, k3, z, type1=1, type2=2, mmin=1e10, mmax=1e17):
 
         kernel = lambda m: self.dndm(m, z) * self.G_a(k2, m, z, type1) * self.bh(m, z)
-        integral = integrate.quad(kernel, self.mmin, self.mmax)[0]
+        integral = integrate.quad(kernel, mmin, mmax)[0]
 
         kernel = lambda m: self.dndm(m, z) * self.G_a(k3, m, z, type2) * self.bh(m, z)
-        integral *= integrate.quad(kernel, self.mmin, self.mmax)[0]
+        integral *= integrate.quad(kernel, mmin, mmax)[0]
 
         kernel = lambda m: self.dndm(m, z) * m * self.u_NFW(k1, m, z, f=1.0)
-        integral *= integrate.quad(kernel, self.mmin, self.mmax)[0]
+        integral *= integrate.quad(kernel, mmin, mmax)[0]
 
         return integral * self.bk_lin(k1, k2, k3, z)
 
@@ -375,7 +375,7 @@ class halomodel:
 
         return One_halo, Two_halo, Three_halo, One_halo + Two_halo + Three_halo
 
-    def source_source_lens_bs_1h(self, k1, k2, k3, z, type=1):
+    def source_source_lens_bs_1h(self, k1, k2, k3, z, type=1, mmin=1e10, mmax=1e17):
 
         kernel = (
             lambda m: self.dndm(m, z)
@@ -385,14 +385,14 @@ class halomodel:
             * self.u_NFW(k1, m, z, f=1.0)
             * self.u_NFW(k2, m, z, f=1.0)
         )
-        integral = integrate.quad(kernel, self.mmin, self.mmax)[0]
+        integral = integrate.quad(kernel, mmin, mmax)[0]
 
         return integral
 
-    def source_source_lens_bs_2h(self, k1, k2, k3, z, type=1):
+    def source_source_lens_bs_2h(self, k1, k2, k3, z, type=1, mmin=1e10, mmax=1e17):
 
         kernel = lambda m: self.dndm(m, z) * self.G_a(k3, m, type) * self.bh(m, z)
-        summand1 = integrate.quad(kernel, self.mmin, self.mmax)[0]
+        summand1 = integrate.quad(kernel, mmin, mmax)[0]
 
         kernel = (
             lambda m: self.dndm(m, z)
@@ -402,12 +402,12 @@ class halomodel:
             * self.u_NFW(k2, m, z, 1.0)
             * self.bh(m, z)
         )
-        summand1 *= integrate.quad(kernel, self.mmin, self.mmax)[0]
+        summand1 *= integrate.quad(kernel, mmin, mmax)[0]
 
         summand1 *= self.pk_lin(k3, z)
 
         kernel = lambda m: self.dndm(m, z) * m * self.u_NFW(k1, m) * self.bh(m, z)
-        summand2 = integrate.quad(kernel, self.mmin, self.mmax)[0]
+        summand2 = integrate.quad(kernel, mmin, mmax)[0]
 
         kernel = (
             lambda m: self.dndm(m, z)
@@ -416,12 +416,12 @@ class halomodel:
             * self.G_a(k3, m)
             * self.bh(m, z)
         )
-        summand2 *= integrate.quad(kernel, self.mmin, self.mmax)[0]
+        summand2 *= integrate.quad(kernel, mmin, mmax)[0]
 
         summand2 *= self.pk_lin(k1, z)
 
         kernel = lambda m: self.dndm(m, z) * m * self.u_NFW(k2, m) * self.bh(m, z)
-        summand3 = integrate.quad(kernel, self.mmin, self.mmax)[0]
+        summand3 = integrate.quad(kernel, mmin, mmax)[0]
 
         kernel = (
             lambda m: self.dndm(m, z)
@@ -431,21 +431,21 @@ class halomodel:
             * self.bh(m, z)
         )
 
-        summand3 *= integrate.quad(kernel, self.mmin, self.mmax)[0]
+        summand3 *= integrate.quad(kernel, mmin, mmax)[0]
 
         summand3 *= self.pk_lin(k2, z)
 
         return summand1 + summand2 + summand3
 
-    def source_source_lens_bs_3h(self, k1, k2, k3, z, type=1):
+    def source_source_lens_bs_3h(self, k1, k2, k3, z, type=1, mmin=1e10, mmax=1e17):
         kernel = lambda m: self.dndm(m, z) * self.G_a(k3, m) * self.bh(m, z)
-        integral = integrate.quad(kernel, self.mmin, self.mmax)[0]
+        integral = integrate.quad(kernel, mmin, mmax)[0]
 
         kernel = lambda m: self.dndm(m, z) * m * self.u_NFW(k1, m) * self.bh(m, z)
-        integral *= integrate.quad(kernel, self.mmin, self.mmax)[0]
+        integral *= integrate.quad(kernel, mmin, mmax)[0]
 
         kernel = lambda m: self.dndm(m, z) * m * self.u_NFW(k2, m) * self.bh(m, z)
-        integral *= integrate.quad(kernel, self.mmin, self.mmax)[0]
+        integral *= integrate.quad(kernel, mmin, mmax)[0]
 
         return integral * self.bk_lin(k1, k2, k3, z)
 
