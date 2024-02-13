@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 from scipy.special import sici
 import scipy.integrate as integrate
 
-c_over_H0 = 3000  # Mpc/h
 
 
 class halomodel:
@@ -394,7 +393,7 @@ class halomodel:
             lambda m: self.dndm(m, z)
             * self.G_a(k3, m, z, type2)
             * m
-            * self.u_NFW(k1, m, z, 1.0)
+            * self.u_NFW(k1, m, z)
             * self.bh(m, z)
         )
         summand2 *= integrate.quad(kernel, mmin, mmax)[0]
@@ -408,7 +407,7 @@ class halomodel:
             lambda m: self.dndm(m, z)
             * self.G_a(k2, m, z, type1)
             * m
-            * self.u_NFW(k1, m, z, 1.0)
+            * self.u_NFW(k1, m, z)
             * self.bh(m, z)
         )
         summand3 *= integrate.quad(kernel, mmin, mmax)[0]
@@ -427,7 +426,7 @@ class halomodel:
         kernel = lambda m: self.dndm(m, z) * self.G_a(k3, m, z, type2) * self.bh(m, z)
         integral *= integrate.quad(kernel, mmin, mmax)[0]
 
-        kernel = lambda m: self.dndm(m, z) * m * self.u_NFW(k1, m, z, f=1.0)
+        kernel = lambda m: self.dndm(m, z) * m * self.u_NFW(k1, m, z)
         integral *= integrate.quad(kernel, mmin, mmax)[0]
 
         return integral * self.bk_lin(k1, k2, k3, z)
@@ -512,7 +511,7 @@ class halomodel:
 
         summand2 *= self.pk_lin(k1, z)
 
-        kernel = lambda m: self.dndm(m, z) * m * self.u_NFW(k2, m) * self.bh(m, z)
+        kernel = lambda m: self.dndm(m, z) * m * self.u_NFW(k2, m, z) * self.bh(m, z)
         summand3 = integrate.quad(kernel, mmin, mmax)[0]
 
         kernel = (
@@ -530,13 +529,13 @@ class halomodel:
         return summand1 + summand2 + summand3
 
     def source_source_lens_bs_3h(self, k1, k2, k3, z, type=1, mmin=1e10, mmax=1e17):
-        kernel = lambda m: self.dndm(m, z) * self.G_a(k3, m, type) * self.bh(m, z)
+        kernel = lambda m: self.dndm(m, z) * self.G_a(k3, m, z, type) * self.bh(m, z)
         integral = integrate.quad(kernel, mmin, mmax)[0]
 
-        kernel = lambda m: self.dndm(m, z) * m * self.u_NFW(k1, m) * self.bh(m, z)
+        kernel = lambda m: self.dndm(m, z) * m * self.u_NFW(k1, m, z) * self.bh(m, z)
         integral *= integrate.quad(kernel, mmin, mmax)[0]
 
-        kernel = lambda m: self.dndm(m, z) * m * self.u_NFW(k2, m) * self.bh(m, z)
+        kernel = lambda m: self.dndm(m, z) * m * self.u_NFW(k2, m, z) * self.bh(m, z)
         integral *= integrate.quad(kernel, mmin, mmax)[0]
 
         return integral * self.bk_lin(k1, k2, k3, z)
