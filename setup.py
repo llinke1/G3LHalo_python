@@ -8,7 +8,7 @@ setup(
     author='Laila Linke',
     author_email='laila.linke@uibk.ac.at',
     packages=['g3lhalo'],
-    install_requires=[],
+    install_requires=['numpy'],
     classifiers=[
         'Development Status :: 2 - PreAlpha',
         'Environment :: GPU :: NVIDIA CUDA :: 12 :: 12.1'
