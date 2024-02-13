@@ -4,122 +4,85 @@ import matplotlib.pyplot as plt
 from scipy.special import sici
 import scipy.integrate as integrate
 
-# from quadpy import quad
-
 c_over_H0 = 3000  # Mpc/h
 
 
 class halomodel:
 
-    def __init__(self, kmin, kmax, zmin, zmax, mmin, mmax, nbins=128):
-        self.kmin = kmin
-        self.kmax = kmax
-        self.zmin = zmin
-        self.zmax = zmax
-        self.mmin = mmin
-        self.mmax = mmax
-        self.nbins = nbins
+    def __init__(self, verbose=False, cosmo=None, hmfunc=None, hbfunc=None, cmfunc=None):
 
-    def set_cosmo(self, Omega_c, Omega_b, h, sigma8, n_s):
-        ks = np.geomspace(self.kmin, self.kmax, self.nbins)
-        zs = np.linspace(self.zmin, self.zmax, self.nbins)
+        self.verbose=verbose
 
-        a = 1 / (1 + zs)
+        if type(cosmo) is dict:
+            self.set_cosmo(cosmo)
+
+        if callable(hmfunc):
+            self.set_hmf(hmfunc)
+
+        
+        if callable(hbfunc):
+            self.set_halobias(hbfunc)
+
+        if callable(cmfunc):
+            self.set_concentration_mass_relation(cmfunc)
+
+        
+
+
+    def set_cosmo(self, cosmo):
+
+        if self.verbose:
+            print("Setting cosmology")
+            print(f"Om_c: {cosmo['Om_c']}")
+            print(f"Om_b: {cosmo['Om_b']}")
+            print(f"h: {cosmo['h']}")
+            print(f"sigma_8: {cosmo['sigma_8']}")
+            print(f"n_s: {cosmo['n_s']}")
 
         self.cosmo = ccl.Cosmology(
-            Omega_c=Omega_c, Omega_b=Omega_b, h=h, sigma8=sigma8, n_s=n_s
+            Omega_c=cosmo['Om_c'], Omega_b=cosmo['Om_b'], h=cosmo['h'], sigma8=cosmo['sigma_8'], n_s=cosmo['n_s']
         )
 
-        # self.pk_lin = ccl.linear_matter_power(self.cosmo, ks, a)
+        if self.verbose:
+            print("Also setting linear matter power spectrum")
+
         self.pk_lin = lambda k, z: ccl.linear_matter_power(
             self.cosmo, k, 1.0 / (1.0 + z)
         )
 
-        # self.w = ccl.comoving_angular_distance(self.cosmo, a)
-        # self.dwdz = 1 / np.sqrt(ccl.h_over_h0(self.cosmo, a)) * c_over_H0
-
-    # def set_nz_lenses(self, zs, n):
-    #     zs_new = np.linspace(self.zmin, self.zmax, self.nbins)
-    #     self.n_l = np.interp(zs_new, zs, n, left=0, right=0)
-    #     plt.plot(zs, n)
-    #     plt.plot(zs_new, self.n_l)
-
-    # def set_nz_sources(self, zs, n):
-    #     zs_new = np.linspace(self.zmin, self.zmax, self.nbins)
-    #     self.n_s = np.interp(zs_new, zs, n, left=0, right=0)
-    #     self.set_lensing_efficiency()
-
-    # def set_lensing_efficiency(self):
-    #     self.gs = np.zeros_like(self.w)
-    #     dz = (self.zmax - self.zmin) / self.nbins
-
-    #     for i, w in enumerate(self.w):
-    #         for j, wprime in enumerate(self.w):
-    #             if wprime >= w:
-    #                 self.gs[i] += self.n_s[j] * (wprime - w) / wprime * dz
 
     def set_hmf(self, hmfunc):
-        # ms = np.geomspace(self.mmin, self.mmax, self.nbins)
-        # zs = np.linspace(self.zmin, self.zmax, self.nbins)
-        # a = 1 / (1 + zs)
 
-        # self.dndm = []
-        # for a_ in a:
-        #    self.dndm.append(hmfunc(self.cosmo, ms, a_) / (ms * np.log(10)))
+        if self.verbose:
+            print("Setting halo mass function")
+            print(hmfunc)  
 
-        # self.dndm = np.array(self.dndm)
         self.dndm = lambda m, z: hmfunc(self.cosmo, m, 1.0 / (1.0 + z)) / (
             m * np.log(10)
         )
 
     def set_halobias(self, hbfunc):
+        if self.verbose:
+            print("Setting halo bias function")
+            print(hbfunc)
         self.bh = lambda m, z: hbfunc(self.cosmo, m, 1.0 / (1.0 + z))
-        # ms = np.geomspace(self.mmin, self.mmax, self.nbins)
-        # zs = np.linspace(self.zmin, self.zmax, self.nbins)
-        # a = 1 / (1 + zs)
-
-        # self.bh = []
-        # for a_ in a:
-        #     self.bh.append(hbfunc(self.cosmo, ms, a_))
-
-        # self.bh = np.array(self.bh)
 
     def set_concentration_mass_relation(self, cmfunc):
+        if self.verbose:
+            print("Setting concentration mass relation")
+            print(cmfunc)
         self.cm = cmfunc
-        # ms=np.geomspace(self.mmin, self.mmax, self.nbins)
-        # zs=np.linspace(self.zmin, self.zmax, self.nbins)
-        # a=1/(1+zs)
 
-        # self.cm=[]
-        # for a_ in a:
-        #     self.cm.append(cmfunc(self.cosmo, ms, a_))
-
-        # self.cm=np.array(self.cm)
 
     def set_hod1(self, hodfunc_cen, hodfunc_sat):
-        # ms=np.geomspace(self.mmin, self.mmax, self.nbins)
-
-        # self.hod_cen1=hodfunc_cen(ms)
-        # self.hod_sat1=hodfunc_sat(ms)
-
         self.hod_cen1 = hodfunc_cen
         self.hod_sat1 = hodfunc_sat
 
     def set_hod2(self, hodfunc_cen, hodfunc_sat):
-        # ms=np.geomspace(self.mmin, self.mmax, self.nbins)
-
-        # self.hod_cen2=hodfunc_cen(ms)
-        # self.hod_sat2=hodfunc_sat(ms)
-
         self.hod_cen2 = hodfunc_cen
         self.hod_sat2 = hodfunc_sat
 
     def set_hod_corr(self, A=-1, epsilon=0):
-        # ms = np.geomspace(self.mmin, self.mmax, self.nbins)
-        # self.hod_satsat = self.hod_sat1 * self.hod_sat2 + A * np.power(
-        #     ms, epsilon
-        # ) * np.sqrt(self.hod_sat1 * self.hod_sat2)
-
         self.hod_satsat = lambda m: self.hod_sat1(m) * self.hod_sat2(m) + A * np.power(
             m, epsilon
         ) * np.sqrt(self.hod_sat1(m) * self.hod_sat2(m))
@@ -146,7 +109,7 @@ class halomodel:
         self.flens1 = flens1
         self.flens2 = flens2
 
-    def u_NFW(self, k, m, z, f):
+    def u_NFW(self, k, m, z, f=1.0):
         a = 1 / (1 + z)
         c = f * self.cm(self.cosmo, m, a)
 
@@ -207,7 +170,7 @@ class halomodel:
 
         return Nc + Ns * u
 
-    def get_ave_numberdensity(self, z, type=1):
+    def get_ave_numberdensity(self, z, type=1, mmin=1e10, mmax=1e17):
         if type == 1:
             Nc = self.hod_cen1
             Ns = self.hod_sat1
@@ -218,9 +181,9 @@ class halomodel:
         a = 1 / (1 + z)
         kernel = lambda m: (Nc(m) + Ns(m)) * self.dndm(m, z)
 
-        return integrate.quad(kernel, self.mmin, self.mmax)[0]
+        return integrate.quad(kernel, mmin, mmax)[0]
 
-    def lens_lens_ps_1h(self, ks, z, type1=1, type2=2):
+    def lens_lens_ps_1h(self, ks, z, type1=1, type2=2, mmin=1e10, mmax=1e17):
 
         ks = np.array(ks)
         integral = []
@@ -228,13 +191,12 @@ class halomodel:
         for k in ks:
             kernel = lambda m: self.G_ab(k, k, m, z, type1, type2) * self.dndm(m, z)
 
-            integral.append(integrate.quad(kernel, self.mmin, self.mmax)[0])
-        # integral=quad(kernel, self.mmin, self.mmax)
+            integral.append(integrate.quad(kernel, mmin, mmax)[0])
 
         integral = np.array(integral)
         return integral
 
-    def lens_lens_ps_2h(self, ks, z, type1=1, type2=2):
+    def lens_lens_ps_2h(self, ks, z, type1=1, type2=2, mmin=1e10, mmax=1e17):
 
         ks = np.array(ks)
 
@@ -244,7 +206,7 @@ class halomodel:
             kernel = (
                 lambda m: self.G_a(k, m, z, type1) * self.dndm(m, z) * self.bh(m, z)
             )
-            integral1.append(integrate.quad(kernel, self.mmin, self.mmax)[0])
+            integral1.append(integrate.quad(kernel, mmin, mmax)[0])
 
         integral1 = np.array(integral1)
 
