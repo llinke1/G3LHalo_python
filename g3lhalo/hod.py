@@ -8,3 +8,9 @@ def HOD_Zheng(alpha, mth, sigma, mprime, beta):
     
     return Ncen, Nsat
 
+
+def HOD_Zheng05(mmin, sigma, m0, m1, alpha):
+    Ncen = lambda m: (m>m0)*np.power((m-m0)/m1, alpha)
+    Nsat = lambda m: 0.5*(1+erf(np.log10(m/mmin)/sigma))
+
+    return Ncen, Nsat

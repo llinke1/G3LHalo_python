@@ -38,11 +38,7 @@ class halomodel:
         # self.w = ccl.comoving_angular_distance(self.cosmo, a)
         # self.dwdz = 1 / np.sqrt(ccl.h_over_h0(self.cosmo, a)) * c_over_H0
 
-    # def set_nz_lenses(self, zs, n):
-    #     zs_new = np.linspace(self.zmin, self.zmax, self.nbins)
-    #     self.n_l = np.interp(zs_new, zs, n, left=0, right=0)
-    #     plt.plot(zs, n)
-    #     plt.plot(zs_new, self.n_l)
+
 
     # def set_nz_sources(self, zs, n):
     #     zs_new = np.linspace(self.zmin, self.zmax, self.nbins)
@@ -114,15 +110,17 @@ class halomodel:
         self.hod_cen2 = hodfunc_cen
         self.hod_sat2 = hodfunc_sat
 
-    def set_hod_corr(self, A=-1, epsilon=0):
+    def set_hod_corr(self):
         # ms = np.geomspace(self.mmin, self.mmax, self.nbins)
         # self.hod_satsat = self.hod_sat1 * self.hod_sat2 + A * np.power(
         #     ms, epsilon
         # ) * np.sqrt(self.hod_sat1 * self.hod_sat2)
 
-        self.hod_satsat = lambda m: self.hod_sat1(m) * self.hod_sat2(m) + A * np.power(
-            m, epsilon
-        ) * np.sqrt(self.hod_sat1(m) * self.hod_sat2(m))
+        self.hod_satsat = lambda m: self.hod_sat1(m) * self.hod_sat2(
+            m
+        ) + self.A * np.power(m, self.epsilon) * np.sqrt(
+            self.hod_sat1(m) * self.hod_sat2(m)
+        )
 
     def set_hods(
         self,
@@ -130,7 +128,7 @@ class halomodel:
         hodfunc_sat1,
         hodfunc_cen2=None,
         hodfunc_sat2=None,
-        A=-1,
+        A=0,
         epsilon=0,
         flens1=1,
         flens2=1,
@@ -141,7 +139,9 @@ class halomodel:
         else:
             self.set_hod2(hodfunc_cen1, hodfunc_sat1)
 
-        self.set_hod_corr(A, epsilon)
+        self.A = A
+        self.epsilon = epsilon
+        self.set_hod_corr()
 
         self.flens1 = flens1
         self.flens2 = flens2
@@ -217,6 +217,11 @@ class halomodel:
             Ns = self.hod_cen2
         a = 1 / (1 + z)
         kernel = lambda m: (Nc(m) + Ns(m)) * self.dndm(m, z)
+
+        return integrate.quad(kernel, self.mmin, self.mmax)[0]
+
+    def get_ave_matterdensity(self, z):
+        kernel = lambda m: self.dndm(m, z) * m
 
         return integrate.quad(kernel, self.mmin, self.mmax)[0]
 
@@ -301,11 +306,18 @@ class halomodel:
             integral1.append(integrate.quad(kernel, self.mmin, self.mmax)[0])
         integral1 = np.array(integral1)
 
+
         integral2 = []
         for k in ks:
-            kernel = lambda m: self.u_NFW(k, m, z, 1.0) * self.dndm(m, z) * m
+            kernel = lambda m: self.u_NFW(k, m, z, 1.0) * self.dndm(m, z) * m * self.bh(m, z)
             integral2.append(integrate.quad(kernel, self.mmin, self.mmax)[0])
+        
         integral2 = np.array(integral2)
+
+        rho_bar = ccl.rho_x(self.cosmo, 1 / (1 + z), "matter")
+        corr2 = (rho_bar - self.A_2h_correction(ks, z))* self.u_NFW(ks, self.mmin, z, f=1.0)
+        integral2 += corr2
+
 
         return integral1 * integral2 * self.pk_lin(ks, z)
 
@@ -315,6 +327,49 @@ class halomodel:
 
         One_halo = self.source_lens_ps_1h(ks, z, type) / n / rho_bar
         Two_halo = self.source_lens_ps_2h(ks, z, type) / n / rho_bar
+
+        return One_halo, Two_halo, One_halo + Two_halo
+
+    def source_source_ps_1h(self, ks, z):
+
+        ks = np.array(ks)
+
+        integral = []
+        for k in ks:
+            kernel = lambda m: self.dndm(m, z) * m * m * (self.u_NFW(k, m, z, 1.0)) ** 2
+            integral.append(integrate.quad(kernel, self.mmin, self.mmax, limit=100)[0])
+
+        integral = np.array(integral)
+        return integral
+
+    def source_source_ps_2h(self, ks, z):
+        ks = np.array(ks)
+
+        integral = []
+
+        for k in ks:
+            kernel = (
+                lambda m: self.u_NFW(k, m, z, 1.0) * self.dndm(m, z) * m * self.bh(m, z)
+            )
+            integral.append(integrate.quad(kernel, self.mmin, self.mmax)[0])
+
+        integral = np.array(integral)
+        rho_bar = ccl.rho_x(self.cosmo, 1 / (1 + z), "matter")
+
+        corr = (rho_bar - self.A_2h_correction(ks, z))* self.u_NFW(ks, self.mmin, z, f=1.0)
+        integral += corr
+
+        return integral**2 * self.pk_lin(ks, z)
+
+    def A_2h_correction(self, ks, z):
+        kernel_A = lambda m: self.dndm(m, z) * self.bh(m, z) * m
+        A = integrate.quad(kernel_A, self.mmin, self.mmax)[0] 
+        return A
+
+    def source_source_ps(self, ks, z):
+        rho_bar = ccl.rho_x(self.cosmo, 1 / (1 + z), "matter")
+        One_halo = self.source_source_ps_1h(ks, z) / rho_bar**2
+        Two_halo = self.source_source_ps_2h(ks, z) / rho_bar**2
 
         return One_halo, Two_halo, One_halo + Two_halo
 
@@ -440,32 +495,32 @@ class halomodel:
             * self.u_NFW(k2, m, z, 1.0)
             * self.bh(m, z)
         )
-        summand1 *= integrate.quad(kernel, self.mmin, self.mmax)[0]
+        summand1 *= integrate.quad(kernel, self.mmin, self.mmax, limit=100)[0]
 
         summand1 *= self.pk_lin(k3, z)
 
-        kernel = lambda m: self.dndm(m, z) * m * self.u_NFW(k1, m) * self.bh(m, z)
+        kernel = lambda m: self.dndm(m, z) * m * self.u_NFW(k1, m, z, 1.0) * self.bh(m, z)
         summand2 = integrate.quad(kernel, self.mmin, self.mmax)[0]
 
         kernel = (
             lambda m: self.dndm(m, z)
             * m
             * self.u_NFW(k2, m, z, 1.0)
-            * self.G_a(k3, m)
+            * self.G_a(k3, m, z, type)
             * self.bh(m, z)
         )
         summand2 *= integrate.quad(kernel, self.mmin, self.mmax)[0]
 
         summand2 *= self.pk_lin(k1, z)
 
-        kernel = lambda m: self.dndm(m, z) * m * self.u_NFW(k2, m) * self.bh(m, z)
+        kernel = lambda m: self.dndm(m, z) * m * self.u_NFW(k2, m, z, 1.0) * self.bh(m, z)
         summand3 = integrate.quad(kernel, self.mmin, self.mmax)[0]
 
         kernel = (
             lambda m: self.dndm(m, z)
             * m
             * self.u_NFW(k1, m, z, 1.0)
-            * self.G_a(k3, m)
+            * self.G_a(k3, m, z, type)
             * self.bh(m, z)
         )
 
@@ -476,13 +531,13 @@ class halomodel:
         return summand1 + summand2 + summand3
 
     def source_source_lens_bs_3h(self, k1, k2, k3, z, type=1):
-        kernel = lambda m: self.dndm(m, z) * self.G_a(k3, m) * self.bh(m, z)
+        kernel = lambda m: self.dndm(m, z) * self.G_a(k3, m,z, type) * self.bh(m, z)
         integral = integrate.quad(kernel, self.mmin, self.mmax)[0]
 
-        kernel = lambda m: self.dndm(m, z) * m * self.u_NFW(k1, m) * self.bh(m, z)
+        kernel = lambda m: self.dndm(m, z) * m * self.u_NFW(k1, m, z, 1.0) * self.bh(m, z)
         integral *= integrate.quad(kernel, self.mmin, self.mmax)[0]
 
-        kernel = lambda m: self.dndm(m, z) * m * self.u_NFW(k2, m) * self.bh(m, z)
+        kernel = lambda m: self.dndm(m, z) * m * self.u_NFW(k2, m, z, 1.0) * self.bh(m, z)
         integral *= integrate.quad(kernel, self.mmin, self.mmax)[0]
 
         return integral * self.bk_lin(k1, k2, k3, z)
