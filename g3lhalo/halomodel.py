@@ -4,109 +4,105 @@ import matplotlib.pyplot as plt
 from scipy.special import sici
 import scipy.integrate as integrate
 
-# from quadpy import quad
-
 c_over_H0 = 3000  # Mpc/h
 
 
 class halomodel:
 
-    def __init__(self, kmin, kmax, zmin, zmax, mmin, mmax, nbins=128):
-        self.kmin = kmin
-        self.kmax = kmax
-        self.zmin = zmin
-        self.zmax = zmax
-        self.mmin = mmin
-        self.mmax = mmax
-        self.nbins = nbins
+    def __init__(self, verbose=False, cosmo=None, hmfunc=None, hbfunc=None, cmfunc=None):
+        """Halomodel initialization. Automatically assigns cosmology, halo mass function, halo bias and concetration mass relation if these are specified.
 
-    def set_cosmo(self, Omega_c, Omega_b, h, sigma8, n_s):
-        ks = np.geomspace(self.kmin, self.kmax, self.nbins)
-        zs = np.linspace(self.zmin, self.zmax, self.nbins)
+        Args:
+            verbose (bool, optional): Control verbosity. Defaults to False.
+            cosmo (dict, optional): Cosmological parameters as dictionary. Needs to include 'Om_b', 'Om_c', 'h', 'sigma_8', 'n_s'. Other parameters are ignored. Defaults to None.
+            hmfunc (function, optional): Halo mass function [dn/dlog10(M/Msun)]. Needs to be function of halo mass and scale factor. Defaults to None.
+            hbfunc (function, optional): Halo bias function. Needs to be function of halo mass and scale factor. Defaults to None.
+            cmfunc (function, optional): Concentration mass relation. Needs to be function of halo mass and scale factor. Defaults to None.
+        """
 
-        a = 1 / (1 + zs)
+        self.verbose=verbose
+
+        if type(cosmo) is dict:
+            self.set_cosmo(cosmo)
+
+        if callable(hmfunc):
+            self.set_hmf(hmfunc)
+
+        
+        if callable(hbfunc):
+            self.set_halobias(hbfunc)
+
+        if callable(cmfunc):
+            self.set_concentration_mass_relation(cmfunc)
+
+        
+
+
+    def set_cosmo(self, cosmo):
+        """Sets cosmology
+
+        Args:
+            cosmo (dict): Cosmological parameters as dictionary. Needs to include 'Om_b', 'Om_c', 'h', 'sigma_8', 'n_s'. Other parameters are ignored.
+        """
+
+        if self.verbose:
+            print("Setting cosmology")
+            print(f"Om_c: {cosmo['Om_c']}")
+            print(f"Om_b: {cosmo['Om_b']}")
+            print(f"h: {cosmo['h']}")
+            print(f"sigma_8: {cosmo['sigma_8']}")
+            print(f"n_s: {cosmo['n_s']}")
 
         self.cosmo = ccl.Cosmology(
-            Omega_c=Omega_c, Omega_b=Omega_b, h=h, sigma8=sigma8, n_s=n_s
+            Omega_c=cosmo['Om_c'], Omega_b=cosmo['Om_b'], h=cosmo['h'], sigma8=cosmo['sigma_8'], n_s=cosmo['n_s']
         )
 
-        # self.pk_lin = ccl.linear_matter_power(self.cosmo, ks, a)
+        if self.verbose:
+            print("Also setting linear matter power spectrum")
+
         self.pk_lin = lambda k, z: ccl.linear_matter_power(
             self.cosmo, k, 1.0 / (1.0 + z)
         )
 
-        # self.w = ccl.comoving_angular_distance(self.cosmo, a)
-        # self.dwdz = 1 / np.sqrt(ccl.h_over_h0(self.cosmo, a)) * c_over_H0
-
-
-
-    # def set_nz_sources(self, zs, n):
-    #     zs_new = np.linspace(self.zmin, self.zmax, self.nbins)
-    #     self.n_s = np.interp(zs_new, zs, n, left=0, right=0)
-    #     self.set_lensing_efficiency()
-
-    # def set_lensing_efficiency(self):
-    #     self.gs = np.zeros_like(self.w)
-    #     dz = (self.zmax - self.zmin) / self.nbins
-
-    #     for i, w in enumerate(self.w):
-    #         for j, wprime in enumerate(self.w):
-    #             if wprime >= w:
-    #                 self.gs[i] += self.n_s[j] * (wprime - w) / wprime * dz
 
     def set_hmf(self, hmfunc):
-        # ms = np.geomspace(self.mmin, self.mmax, self.nbins)
-        # zs = np.linspace(self.zmin, self.zmax, self.nbins)
-        # a = 1 / (1 + zs)
+        """ Sets halo mass function. Note that the internal model.dndm is in units of 1/Msun/Mpc³ and a function of mass and redshift not scale factor!
 
-        # self.dndm = []
-        # for a_ in a:
-        #    self.dndm.append(hmfunc(self.cosmo, ms, a_) / (ms * np.log(10)))
+        Args:
+            hmfunc (function): Halo mass function [dn/dlog10(M/Msun)]. Needs to be function of halo mass and scale factor. 
+        """
 
-        # self.dndm = np.array(self.dndm)
+        if self.verbose:
+            print("Setting halo mass function")
+            print(hmfunc)  
+
         self.dndm = lambda m, z: hmfunc(self.cosmo, m, 1.0 / (1.0 + z)) / (
             m * np.log(10)
         )
 
     def set_halobias(self, hbfunc):
+        """Sets halo bias function.
+
+        Args:
+            hbfunc (_type_): _description_
+        """
+        if self.verbose:
+            print("Setting halo bias function")
+            print(hbfunc)
         self.bh = lambda m, z: hbfunc(self.cosmo, m, 1.0 / (1.0 + z))
-        # ms = np.geomspace(self.mmin, self.mmax, self.nbins)
-        # zs = np.linspace(self.zmin, self.zmax, self.nbins)
-        # a = 1 / (1 + zs)
-
-        # self.bh = []
-        # for a_ in a:
-        #     self.bh.append(hbfunc(self.cosmo, ms, a_))
-
-        # self.bh = np.array(self.bh)
 
     def set_concentration_mass_relation(self, cmfunc):
+        if self.verbose:
+            print("Setting concentration mass relation")
+            print(cmfunc)
         self.cm = cmfunc
-        # ms=np.geomspace(self.mmin, self.mmax, self.nbins)
-        # zs=np.linspace(self.zmin, self.zmax, self.nbins)
-        # a=1/(1+zs)
 
-        # self.cm=[]
-        # for a_ in a:
-        #     self.cm.append(cmfunc(self.cosmo, ms, a_))
-
-        # self.cm=np.array(self.cm)
 
     def set_hod1(self, hodfunc_cen, hodfunc_sat):
-        # ms=np.geomspace(self.mmin, self.mmax, self.nbins)
-
-        # self.hod_cen1=hodfunc_cen(ms)
-        # self.hod_sat1=hodfunc_sat(ms)
-
         self.hod_cen1 = hodfunc_cen
         self.hod_sat1 = hodfunc_sat
 
     def set_hod2(self, hodfunc_cen, hodfunc_sat):
-        # ms=np.geomspace(self.mmin, self.mmax, self.nbins)
-
-        # self.hod_cen2=hodfunc_cen(ms)
-        # self.hod_sat2=hodfunc_sat(ms)
-
         self.hod_cen2 = hodfunc_cen
         self.hod_sat2 = hodfunc_sat
 
@@ -146,7 +142,7 @@ class halomodel:
         self.flens1 = flens1
         self.flens2 = flens2
 
-    def u_NFW(self, k, m, z, f):
+    def u_NFW(self, k, m, z, f=1.0):
         a = 1 / (1 + z)
         c = f * self.cm(self.cosmo, m, a)
 
@@ -207,7 +203,7 @@ class halomodel:
 
         return Nc + Ns * u
 
-    def get_ave_numberdensity(self, z, type=1):
+    def get_ave_numberdensity(self, z, type=1, mmin=1e10, mmax=1e17):
         if type == 1:
             Nc = self.hod_cen1
             Ns = self.hod_sat1
@@ -218,14 +214,9 @@ class halomodel:
         a = 1 / (1 + z)
         kernel = lambda m: (Nc(m) + Ns(m)) * self.dndm(m, z)
 
-        return integrate.quad(kernel, self.mmin, self.mmax)[0]
+        return integrate.quad(kernel, mmin, mmax)[0]
 
-    def get_ave_matterdensity(self, z):
-        kernel = lambda m: self.dndm(m, z) * m
-
-        return integrate.quad(kernel, self.mmin, self.mmax)[0]
-
-    def lens_lens_ps_1h(self, ks, z, type1=1, type2=2):
+    def lens_lens_ps_1h(self, ks, z, type1=1, type2=2, mmin=1e10, mmax=1e17):
 
         ks = np.array(ks)
         integral = []
@@ -233,13 +224,12 @@ class halomodel:
         for k in ks:
             kernel = lambda m: self.G_ab(k, k, m, z, type1, type2) * self.dndm(m, z)
 
-            integral.append(integrate.quad(kernel, self.mmin, self.mmax)[0])
-        # integral=quad(kernel, self.mmin, self.mmax)
+            integral.append(integrate.quad(kernel, mmin, mmax)[0])
 
         integral = np.array(integral)
         return integral
 
-    def lens_lens_ps_2h(self, ks, z, type1=1, type2=2):
+    def lens_lens_ps_2h(self, ks, z, type1=1, type2=2, mmin=1e10, mmax=1e17):
 
         ks = np.array(ks)
 
@@ -249,7 +239,7 @@ class halomodel:
             kernel = (
                 lambda m: self.G_a(k, m, z, type1) * self.dndm(m, z) * self.bh(m, z)
             )
-            integral1.append(integrate.quad(kernel, self.mmin, self.mmax)[0])
+            integral1.append(integrate.quad(kernel, mmin, mmax)[0])
 
         integral1 = np.array(integral1)
 
@@ -262,12 +252,12 @@ class halomodel:
                 kernel = (
                     lambda m: self.G_a(k, m, z, type2) * self.dndm(m, z) * self.bh(m, z)
                 )
-                integral2.append(integrate.quad(kernel, self.mmin, self.mmax)[0])
+                integral2.append(integrate.quad(kernel, mmin, mmax)[0])
             integral2 = np.array(integral2)
 
         return integral1 * integral2 * self.pk_lin(ks, z)
 
-    def lens_lens_ps(self, ks, z, type1=1, type2=2):
+    def lens_lens_ps(self, ks, z, type1=1, type2=2, mmin=1e10, mmax=1e17):
 
         n1 = self.get_ave_numberdensity(z, type1)
         if type1 == type2:
@@ -275,12 +265,12 @@ class halomodel:
         else:
             n2 = self.get_ave_numberdensity(z, type2)
 
-        One_halo = self.lens_lens_ps_1h(ks, z, type1, type2) / n1 / n2
-        Two_halo = self.lens_lens_ps_2h(ks, z, type1, type2) / n1 / n2
+        One_halo = self.lens_lens_ps_1h(ks, z, type1, type2, mmin, mmax) / n1 / n2
+        Two_halo = self.lens_lens_ps_2h(ks, z, type1, type2, mmin, mmax) / n1 / n2
 
         return One_halo, Two_halo, One_halo + Two_halo
 
-    def source_lens_ps_1h(self, ks, z, type=1):
+    def source_lens_ps_1h(self, ks, z, type=1, mmin=1e10, mmax=1e17):
 
         ks = np.array(ks)
 
@@ -292,26 +282,25 @@ class halomodel:
                 * m
                 * self.u_NFW(k, m, z, 1.0)
             )
-            integral.append(integrate.quad(kernel, self.mmin, self.mmax)[0])
+            integral.append(integrate.quad(kernel, mmin, mmax)[0])
 
         integral = np.array(integral)
         return integral
 
-    def source_lens_ps_2h(self, ks, z, type=1):
+    def source_lens_ps_2h(self, ks, z, type=1, mmin=1e10, mmax=1e17):
         ks = np.array(ks)
 
         integral1 = []
         for k in ks:
             kernel = lambda m: self.G_a(k, m, z, type) * self.dndm(m, z) * self.bh(m, z)
-            integral1.append(integrate.quad(kernel, self.mmin, self.mmax)[0])
+            integral1.append(integrate.quad(kernel, mmin, mmax)[0])
         integral1 = np.array(integral1)
 
 
         integral2 = []
         for k in ks:
-            kernel = lambda m: self.u_NFW(k, m, z, 1.0) * self.dndm(m, z) * m * self.bh(m, z)
-            integral2.append(integrate.quad(kernel, self.mmin, self.mmax)[0])
-        
+            kernel = lambda m: self.u_NFW(k, m, z, 1.0) * self.dndm(m, z) * m
+            integral2.append(integrate.quad(kernel, mmin, mmax)[0])
         integral2 = np.array(integral2)
 
         rho_bar = ccl.rho_x(self.cosmo, 1 / (1 + z), "matter")
@@ -321,49 +310,49 @@ class halomodel:
 
         return integral1 * integral2 * self.pk_lin(ks, z)
 
-    def source_lens_ps(self, ks, z, type=1):
+    def source_lens_ps(self, ks, z, type=1, mmin=1e10, mmax=1e17):
         n = self.get_ave_numberdensity(z, type)
         rho_bar = ccl.rho_x(self.cosmo, 1 / (1 + z), "matter")
 
-        One_halo = self.source_lens_ps_1h(ks, z, type) / n / rho_bar
-        Two_halo = self.source_lens_ps_2h(ks, z, type) / n / rho_bar
+        One_halo = self.source_lens_ps_1h(ks, z, type, mmin, mmax) / n / rho_bar
+        Two_halo = self.source_lens_ps_2h(ks, z, type, mmin, mmax) / n / rho_bar
 
         return One_halo, Two_halo, One_halo + Two_halo
 
-    def source_source_ps_1h(self, ks, z):
+    def source_source_ps_1h(self, ks, z, mmin=1e10, mmax=1e17):
 
         ks = np.array(ks)
 
         integral = []
         for k in ks:
-            kernel = lambda m: self.dndm(m, z) * m * m * (self.u_NFW(k, m, z, 1.0)) ** 2
-            integral.append(integrate.quad(kernel, self.mmin, self.mmax, limit=100)[0])
+            kernel = lambda m: self.dndm(m, z) * m * m * (self.u_NFW(k, m, z)) ** 2
+            integral.append(integrate.quad(kernel, mmin, mmax, limit=100)[0])
 
         integral = np.array(integral)
         return integral
 
-    def source_source_ps_2h(self, ks, z):
+    def source_source_ps_2h(self, ks, z, mmin=1e10, mmax=1e17):
         ks = np.array(ks)
 
         integral = []
 
         for k in ks:
             kernel = (
-                lambda m: self.u_NFW(k, m, z, 1.0) * self.dndm(m, z) * m * self.bh(m, z)
+                lambda m: self.u_NFW(k, m, z) * self.dndm(m, z) * m * self.bh(m, z)
             )
-            integral.append(integrate.quad(kernel, self.mmin, self.mmax)[0])
+            integral.append(integrate.quad(kernel, mmin, mmax)[0])
 
         integral = np.array(integral)
         rho_bar = ccl.rho_x(self.cosmo, 1 / (1 + z), "matter")
 
-        corr = (rho_bar - self.A_2h_correction(ks, z))* self.u_NFW(ks, self.mmin, z, f=1.0)
+        corr = (rho_bar - self.A_2h_correction(z, mmin, mmax))* self.u_NFW(ks, mmin, z)
         integral += corr
 
         return integral**2 * self.pk_lin(ks, z)
 
-    def A_2h_correction(self, ks, z):
+    def A_2h_correction(self, z, mmin=1e10, mmax=1e17):
         kernel_A = lambda m: self.dndm(m, z) * self.bh(m, z) * m
-        A = integrate.quad(kernel_A, self.mmin, self.mmax)[0] 
+        A = integrate.quad(kernel_A, mmin, mmax)[0] 
         return A
 
     def source_source_ps(self, ks, z):
@@ -373,7 +362,7 @@ class halomodel:
 
         return One_halo, Two_halo, One_halo + Two_halo
 
-    def source_lens_lens_bs_1h(self, k1, k2, k3, z, type1=1, type2=2):
+    def source_lens_lens_bs_1h(self, k1, k2, k3, z, type1=1, type2=2, mmin=1e10, mmax=1e17):
 
         kernel = (
             lambda m: self.dndm(m, z)
@@ -381,28 +370,28 @@ class halomodel:
             * self.u_NFW(k1, m, z, 1.0)
             * self.G_ab(k2, k3, m, z, type1, type2)
         )
-        integral = integrate.quad(kernel, self.mmin, self.mmax)[0]
+        integral = integrate.quad(kernel, mmin, mmax)[0]
 
         return integral
 
-    def source_lens_lens_bs_2h(self, k1, k2, k3, z, type1=1, type2=2):
+    def source_lens_lens_bs_2h(self, k1, k2, k3, z, type1=1, type2=2, mmin=1e10, mmax=1e17):
 
         kernel = (
             lambda m: self.dndm(m, z) * self.u_NFW(k1, m, z, 1.0) * m * self.bh(m, z)
         )
-        summand1 = integrate.quad(kernel, self.mmin, self.mmax)[0]
+        summand1 = integrate.quad(kernel, mmin, mmax)[0]
 
         kernel = (
             lambda m: self.dndm(m, z)
             * self.G_ab(k2, k3, m, z, type1, type2)
             * self.bh(m, z)
         )
-        summand1 *= integrate.quad(kernel, self.mmin, self.mmax)[0]
+        summand1 *= integrate.quad(kernel, mmin, mmax)[0]
 
         summand1 *= self.pk_lin(k3, z)
 
         kernel = lambda m: self.dndm(m, z) * self.G_a(k2, m, z, type1) * self.bh(m, z)
-        summand2 = integrate.quad(kernel, self.mmin, self.mmax)[0]
+        summand2 = integrate.quad(kernel, mmin, mmax)[0]
 
         kernel = (
             lambda m: self.dndm(m, z)
@@ -411,12 +400,12 @@ class halomodel:
             * self.u_NFW(k1, m, z, 1.0)
             * self.bh(m, z)
         )
-        summand2 *= integrate.quad(kernel, self.mmin, self.mmax)[0]
+        summand2 *= integrate.quad(kernel, mmin, mmax)[0]
 
         summand2 *= self.pk_lin(k1, z)
 
         kernel = lambda m: self.dndm(m, z) * self.G_a(k3, m, z, type2) * self.bh(m, z)
-        summand3 = integrate.quad(kernel, self.mmin, self.mmax)[0]
+        summand3 = integrate.quad(kernel, mmin, mmax)[0]
 
         kernel = (
             lambda m: self.dndm(m, z)
@@ -425,26 +414,26 @@ class halomodel:
             * self.u_NFW(k1, m, z, 1.0)
             * self.bh(m, z)
         )
-        summand3 *= integrate.quad(kernel, self.mmin, self.mmax)[0]
+        summand3 *= integrate.quad(kernel, mmin, mmax)[0]
 
         summand3 *= self.pk_lin(k2, z)
 
         return summand1 + summand2 + summand3
 
-    def source_lens_lens_bs_3h(self, k1, k2, k3, z, type1=1, type2=2):
+    def source_lens_lens_bs_3h(self, k1, k2, k3, z, type1=1, type2=2, mmin=1e10, mmax=1e17):
 
         kernel = lambda m: self.dndm(m, z) * self.G_a(k2, m, z, type1) * self.bh(m, z)
-        integral = integrate.quad(kernel, self.mmin, self.mmax)[0]
+        integral = integrate.quad(kernel, mmin, mmax)[0]
 
         kernel = lambda m: self.dndm(m, z) * self.G_a(k3, m, z, type2) * self.bh(m, z)
-        integral *= integrate.quad(kernel, self.mmin, self.mmax)[0]
+        integral *= integrate.quad(kernel, mmin, mmax)[0]
 
         kernel = lambda m: self.dndm(m, z) * m * self.u_NFW(k1, m, z, f=1.0)
-        integral *= integrate.quad(kernel, self.mmin, self.mmax)[0]
+        integral *= integrate.quad(kernel, mmin, mmax)[0]
 
         return integral * self.bk_lin(k1, k2, k3, z)
 
-    def source_lens_lens_bs(self, k1, k2, k3, z, type1=1, type2=2):
+    def source_lens_lens_bs(self, k1, k2, k3, z, type1=1, type2=2, mmin=1e10, mmax=1e17):
 
         n1 = self.get_ave_numberdensity(z, type1)
         if type1 == type2:
@@ -455,107 +444,107 @@ class halomodel:
         rho_bar = ccl.rho_x(self.cosmo, 1 / (1 + z), "matter")
 
         One_halo = (
-            self.source_lens_lens_bs_1h(k1, k2, k3, z, type1, type2) / n1 / n2 / rho_bar
+            self.source_lens_lens_bs_1h(k1, k2, k3, z, type1, type2, mmin, mmax) / n1 / n2 / rho_bar
         )
 
         Two_halo = (
-            self.source_lens_lens_bs_2h(k1, k2, k3, z, type1, type2) / n1 / n2 / rho_bar
+            self.source_lens_lens_bs_2h(k1, k2, k3, z, type1, type2, mmin, mmax) / n1 / n2 / rho_bar
         )
 
         Three_halo = (
-            self.source_lens_lens_bs_3h(k1, k2, k3, z, type1, type2) / n1 / n2 / rho_bar
+            self.source_lens_lens_bs_3h(k1, k2, k3, z, type1, type2, mmin, mmax) / n1 / n2 / rho_bar
         )
 
         return One_halo, Two_halo, Three_halo, One_halo + Two_halo + Three_halo
 
-    def source_source_lens_bs_1h(self, k1, k2, k3, z, type=1):
+    def source_source_lens_bs_1h(self, k1, k2, k3, z, type=1, mmin=1e10, mmax=1e17):
 
         kernel = (
             lambda m: self.dndm(m, z)
             * self.G_a(k3, m, z, type)
             * m
             * m
-            * self.u_NFW(k1, m, z, f=1.0)
-            * self.u_NFW(k2, m, z, f=1.0)
+            * self.u_NFW(k1, m, z)
+            * self.u_NFW(k2, m, z)
         )
-        integral = integrate.quad(kernel, self.mmin, self.mmax)[0]
+        integral = integrate.quad(kernel, mmin, mmax)[0]
 
         return integral
 
-    def source_source_lens_bs_2h(self, k1, k2, k3, z, type=1):
+    def source_source_lens_bs_2h(self, k1, k2, k3, z, type=1, mmin=1e10, mmax=1e17):
 
         kernel = lambda m: self.dndm(m, z) * self.G_a(k3, m, type) * self.bh(m, z)
-        summand1 = integrate.quad(kernel, self.mmin, self.mmax)[0]
+        summand1 = integrate.quad(kernel, mmin, mmax)[0]
 
         kernel = (
             lambda m: self.dndm(m, z)
             * m
             * m
-            * self.u_NFW(k1, m, z, 1.0)
-            * self.u_NFW(k2, m, z, 1.0)
+            * self.u_NFW(k1, m, z)
+            * self.u_NFW(k2, m, z)
             * self.bh(m, z)
         )
-        summand1 *= integrate.quad(kernel, self.mmin, self.mmax, limit=100)[0]
+        summand1 *= integrate.quad(kernel, mmin, mmax)[0]
 
         summand1 *= self.pk_lin(k3, z)
 
-        kernel = lambda m: self.dndm(m, z) * m * self.u_NFW(k1, m, z, 1.0) * self.bh(m, z)
-        summand2 = integrate.quad(kernel, self.mmin, self.mmax)[0]
+        kernel = lambda m: self.dndm(m, z) * m * self.u_NFW(k1, m, z) * self.bh(m, z)
+        summand2 = integrate.quad(kernel, mmin, mmax)[0]
 
         kernel = (
             lambda m: self.dndm(m, z)
             * m
-            * self.u_NFW(k2, m, z, 1.0)
+            * self.u_NFW(k2, m, z)
             * self.G_a(k3, m, z, type)
             * self.bh(m, z)
         )
-        summand2 *= integrate.quad(kernel, self.mmin, self.mmax)[0]
+        summand2 *= integrate.quad(kernel, mmin, mmax)[0]
 
         summand2 *= self.pk_lin(k1, z)
 
-        kernel = lambda m: self.dndm(m, z) * m * self.u_NFW(k2, m, z, 1.0) * self.bh(m, z)
-        summand3 = integrate.quad(kernel, self.mmin, self.mmax)[0]
+        kernel = lambda m: self.dndm(m, z) * m * self.u_NFW(k2, m) * self.bh(m, z)
+        summand3 = integrate.quad(kernel, mmin, mmax)[0]
 
         kernel = (
             lambda m: self.dndm(m, z)
             * m
-            * self.u_NFW(k1, m, z, 1.0)
+            * self.u_NFW(k1, m, z)
             * self.G_a(k3, m, z, type)
             * self.bh(m, z)
         )
 
-        summand3 *= integrate.quad(kernel, self.mmin, self.mmax)[0]
+        summand3 *= integrate.quad(kernel, mmin, mmax)[0]
 
         summand3 *= self.pk_lin(k2, z)
 
         return summand1 + summand2 + summand3
 
-    def source_source_lens_bs_3h(self, k1, k2, k3, z, type=1):
-        kernel = lambda m: self.dndm(m, z) * self.G_a(k3, m,z, type) * self.bh(m, z)
-        integral = integrate.quad(kernel, self.mmin, self.mmax)[0]
+    def source_source_lens_bs_3h(self, k1, k2, k3, z, type=1, mmin=1e10, mmax=1e17):
+        kernel = lambda m: self.dndm(m, z) * self.G_a(k3, m, type) * self.bh(m, z)
+        integral = integrate.quad(kernel, mmin, mmax)[0]
 
-        kernel = lambda m: self.dndm(m, z) * m * self.u_NFW(k1, m, z, 1.0) * self.bh(m, z)
-        integral *= integrate.quad(kernel, self.mmin, self.mmax)[0]
+        kernel = lambda m: self.dndm(m, z) * m * self.u_NFW(k1, m) * self.bh(m, z)
+        integral *= integrate.quad(kernel, mmin, mmax)[0]
 
-        kernel = lambda m: self.dndm(m, z) * m * self.u_NFW(k2, m, z, 1.0) * self.bh(m, z)
-        integral *= integrate.quad(kernel, self.mmin, self.mmax)[0]
+        kernel = lambda m: self.dndm(m, z) * m * self.u_NFW(k2, m) * self.bh(m, z)
+        integral *= integrate.quad(kernel, mmin, mmax)[0]
 
         return integral * self.bk_lin(k1, k2, k3, z)
 
-    def source_source_lens_bs(self, k1, k2, k3, z, type=1):
+    def source_source_lens_bs(self, k1, k2, k3, z, type=1, mmin=1e10, mmax=1e17):
         n = self.get_ave_numberdensity(z, type)
         rho_bar = ccl.rho_x(self.cosmo, 1 / (1 + z), "matter")
 
         One_halo = (
-            self.source_source_lens_bs_1h(k1, k2, k3, z, type) / n / rho_bar / rho_bar
+            self.source_source_lens_bs_1h(k1, k2, k3, z, type, mmin, mmax) / n / rho_bar / rho_bar
         )
 
         Two_halo = (
-            self.source_source_lens_bs_2h(k1, k2, k3, z, type) / n / rho_bar / rho_bar
+            self.source_source_lens_bs_2h(k1, k2, k3, z, type, mmin, mmax) / n / rho_bar / rho_bar
         )
 
         Three_halo = (
-            self.source_source_lens_bs_3h(k1, k2, k3, z, type) / n / rho_bar / rho_bar
+            self.source_source_lens_bs_3h(k1, k2, k3, z, type, mmin, mmax) / n / rho_bar / rho_bar
         )
 
         return One_halo, Two_halo, Three_halo, One_halo + Two_halo + Three_halo
